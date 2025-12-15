@@ -1,0 +1,119 @@
+---
+title: "Using AI Badgr (OpenAI-compatible)"
+sidebarTitle: "AI Badgr"
+description: "This example demonstrates how to use AI Badgr (Budget/Utility, OpenAI-compatible) with Trigger.dev."
+---
+
+## Overview
+
+[AI Badgr](https://aibadgr.com) is a budget-friendly, OpenAI-compatible AI provider. It provides a cost-effective way to use AI models in your Trigger.dev tasks with tier-based pricing.
+
+AI Badgr is fully compatible with the OpenAI API, so you can use it as a drop-in replacement for OpenAI in your existing code.
+
+## Using with Vercel AI SDK
+
+The [Vercel AI SDK](https://www.npmjs.com/package/ai) makes it easy to use AI Badgr with a consistent interface.
+
+### Task code
+
+```ts trigger/ai-badgr-vercel.ts
+import { logger, task } from "@trigger.dev/sdk";
+import { generateText } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+
+// Configure AI Badgr as an OpenAI-compatible provider
+const aibadgr = createOpenAI({
+  apiKey: process.env.AIBADGR_API_KEY,
+  baseURL: process.env.AIBADGR_BASE_URL || "https://aibadgr.com/api/v1",
+});
+
+export const aiBadgrTask = task({
+  id: "ai-badgr-generate-text",
+  run: async (payload: { prompt: string }) => {
+    const chatCompletion = await generateText({
+      // Use tier-based model names: basic, normal, or premium
+      model: aibadgr("premium"), // premium tier recommended for best quality
+      system: "You are a friendly assistant!",
+      prompt: payload.prompt,
+    });
+
+    logger.log("AI Badgr response: " + chatCompletion.text);
+
+    return chatCompletion;
+  },
+});
+```
+
+### Environment variables
+
+Add these environment variables to your project:
+
+```bash .env
+AIBADGR_API_KEY=your_api_key_here
+AIBADGR_BASE_URL=https://aibadgr.com/api/v1  # Optional, defaults to this value
+```
+
+## Using with OpenAI SDK
+
+You can also use AI Badgr directly with the OpenAI SDK by configuring the base URL.
+
+### Task code
+
+```ts trigger/ai-badgr-openai.ts
+import { task } from "@trigger.dev/sdk";
+import OpenAI from "openai";
+
+const aibadgr = new OpenAI({
+  apiKey: process.env.AIBADGR_API_KEY,
+  baseURL: process.env.AIBADGR_BASE_URL || "https://aibadgr.com/api/v1",
+});
+
+export const aiBadgrOpenAITask = task({
+  id: "ai-badgr-openai-task",
+  retry: {
+    maxAttempts: 3,
+    factor: 2,
+    minTimeoutInMs: 1000,
+    maxTimeoutInMs: 10_000,
+  },
+  run: async (payload: { prompt: string }) => {
+    const chatCompletion = await aibadgr.chat.completions.create({
+      messages: [{ role: "user", content: payload.prompt }],
+      // Use tier-based model names: basic, normal, or premium
+      model: "premium", // premium tier recommended for best quality
+    });
+
+    if (chatCompletion.choices[0]?.message.content === undefined) {
+      throw new Error("AI Badgr call failed");
+    }
+
+    return chatCompletion.choices[0].message.content;
+  },
+});
+```
+
+## Model naming
+
+AI Badgr uses tier-based model names for simplicity:
+
+- `basic` - Fastest, most economical
+- `normal` - Balanced performance and cost
+- `premium` - Best quality (recommended for most use cases)
+
+OpenAI model names are also accepted and automatically mapped to the appropriate tier.
+
+## Testing your task
+
+To test this task in the dashboard, you can use the following payload:
+
+```json
+{
+  "prompt": "What is the meaning of life?"
+}
+```
+
+## Learn more
+
+- [AI Badgr Documentation](https://aibadgr.com/docs)
+- [Vercel AI SDK Documentation](https://sdk.vercel.ai/)
+- [OpenAI SDK Documentation](https://github.com/openai/openai-node)
